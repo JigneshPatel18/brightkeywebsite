@@ -8,11 +8,7 @@
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- FIREBASE SDKS (v8 Compat for simple single-file integration) -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
+    <!-- Removed Firebase SDKs for Convex Migration -->
     <style>
         :root {
             --primary: #2e7d32; 
@@ -376,28 +372,28 @@
         </div>
     </div>
 
-    <!-- MAIN JAVASCRIPT & FIREBASE INTEGRATION -->
-    <script>
+    <!-- CONVEX CDN CLIENT -->
+    <script type="module">
+        import { ConvexClient } from 'https://cdn.jsdelivr.net/npm/convex@1.11.3/+esm';
+
         // =========================================================
-        // FIREBASE CONFIGURATION (REPLACE WITH YOUR ACTUAL KEYS)
+        // CONVEX CONFIGURATION
         // =========================================================
-      const firebaseConfig = {
- apiKey: "AIzaSyD077XFaZg4PyCeaA3HfBIyC3BHrTOIHj0",
-authDomain: "brightinventory.firebaseapp.com",
-projectId: "brightinventory",
-storageBucket: "brightinventory.firebasestorage.app",
-messagingSenderId: "81459501866",
-appId: "1:81459501866:web:231e90cbbd55c1960c5c53"
-};
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+        // IMPORTANT: PASTE YOUR CONVEX URL HERE
+        const CONVEX_URL = "https://colorless-pheasant-805.convex.cloud"; 
+        
+        let convex;
+        if (CONVEX_URL !== "YOUR_CONVEX_URL_HERE") {
+            convex = new ConvexClient(CONVEX_URL);
+        } else {
+            console.warn("Please set CONVEX_URL to your deployed convex project.");
+        }
 
         // Local State
         let records = [];
-        let currentUser = null;
-        let unsubscribeFirestore = null;
+        let currentUserEmail = localStorage.getItem('bright_email') || null;
+        let currentUserId = localStorage.getItem('bright_userId') || null;
+        let unsubscribeConvex = null;
 
         // "ENTER" KEY NAVIGATION LOGIC
         const enterNavInputs = document.querySelectorAll('.enter-nav');
@@ -415,7 +411,7 @@ appId: "1:81459501866:web:231e90cbbd55c1960c5c53"
         });
 
         // AUTO-SUGGESTION LOGIC
-        function updateDataLists() {
+        window.updateDataLists = function() {
             const vendors = [...new Set(records.map(r => r.vendor).filter(Boolean))];
             const names = [...new Set(records.map(r => r.name).filter(Boolean))];
             
@@ -423,15 +419,15 @@ appId: "1:81459501866:web:231e90cbbd55c1960c5c53"
             document.getElementById('customerList').innerHTML = names.map(n => `<option value="${n}">`).join('');
         }
 
-        // --- AUTHENTICATION (FIREBASE) ---
-        function showMessage(text, isError = true) {
+        // --- AUTHENTICATION ---
+        window.showMessage = function(text, isError = true) {
             const msgBox = document.getElementById('auth-msg');
             msgBox.style.display = 'block'; msgBox.textContent = text;
             msgBox.className = isError ? 'msg-box msg-error' : 'msg-box msg-success';
             setTimeout(() => { msgBox.style.display = 'none'; }, 4000);
         }
 
-        function switchAuthTab(tab) {
+        window.switchAuthTab = function(tab) {
             document.querySelectorAll('.auth-tab').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.auth-form').forEach(el => el.classList.remove('active'));
             if(tab === 'login') {
@@ -443,29 +439,29 @@ appId: "1:81459501866:web:231e90cbbd55c1960c5c53"
             }
         }
 
-        // Real-time Auth State Listener (Handles Persistent Login Automatically)
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                currentUser = user.email;
-                let displayName = currentUser.split('@')[0];
+        window.checkAuthState = function() {
+            if (currentUserId && currentUserEmail && convex) {
+                let displayName = currentUserEmail.split('@')[0];
                 document.getElementById('welcome-user').textContent = "User: " + displayName;
                 
                 document.getElementById('auth-page').style.display = 'none';
                 document.getElementById('app-page').style.display = 'flex';
                 document.getElementById('purchaseDate').valueAsDate = new Date(); // Set today's date
                 
-                startRealtimeSync(); // Load Firestore Data
+                startRealtimeSync(); // Load Convex Data
             } else {
-                currentUser = null;
+                currentUserId = null;
+                currentUserEmail = null;
                 records = []; // Clear local array
-                if (unsubscribeFirestore) unsubscribeFirestore(); // Stop syncing
+                if (unsubscribeConvex) unsubscribeConvex(); // Stop syncing
                 
                 document.getElementById('app-page').style.display = 'none';
                 document.getElementById('auth-page').style.display = 'flex';
             }
-        });
+        }
 
-        function signup() {
+        window.signup = async function() {
+            if (!convex) return showMessage("Convex URL is not set. Please deploy Convex first.");
             const email = document.getElementById('signup-email').value.trim();
             const p1 = document.getElementById('signup-pass').value.trim();
             const p2 = document.getElementById('signup-pass-confirm').value.trim();
@@ -473,60 +469,62 @@ appId: "1:81459501866:web:231e90cbbd55c1960c5c53"
             if(!email || !p1 || !p2) return showMessage("Please fill in all fields.");
             if(p1 !== p2) return showMessage("Passwords do not match!");
 
-            auth.createUserWithEmailAndPassword(email, p1)
-                .then((userCredential) => {
-                    document.getElementById('signup-email').value = '';
-                    document.getElementById('signup-pass').value = '';
-                    document.getElementById('signup-pass-confirm').value = '';
-                })
-                .catch((error) => {
-                    showMessage(error.message);
-                });
+            try {
+                await convex.mutation("auth:signup", { email, password: p1 });
+                document.getElementById('signup-email').value = '';
+                document.getElementById('signup-pass').value = '';
+                document.getElementById('signup-pass-confirm').value = '';
+                showMessage("Account created successfully! Please sign in.", false);
+                switchAuthTab('login');
+            } catch (error) {
+                showMessage(error.message);
+            }
         }
 
-        function login() {
+        window.login = async function() {
+            if (!convex) return showMessage("Convex URL is not set. Please deploy Convex first.");
             const email = document.getElementById('login-email').value.trim();
             const p = document.getElementById('login-pass').value.trim();
             if(!email || !p) return showMessage("Please enter Gmail ID and Password.");
 
-            auth.signInWithEmailAndPassword(email, p)
-                .catch((error) => {
-                    showMessage("Incorrect Gmail ID or Password!");
-                });
+            try {
+                const userId = await convex.mutation("auth:login", { email, password: p });
+                currentUserId = userId;
+                currentUserEmail = email;
+                localStorage.setItem('bright_userId', userId);
+                localStorage.setItem('bright_email', email);
+                checkAuthState();
+            } catch (error) {
+                showMessage("Incorrect Gmail ID or Password!");
+            }
         }
 
-        function logout() {
-            auth.signOut();
+        window.logout = function() {
+            currentUserId = null;
+            currentUserEmail = null;
+            localStorage.removeItem('bright_userId');
+            localStorage.removeItem('bright_email');
             document.getElementById('login-pass').value = '';
+            checkAuthState();
         }
 
-        // --- FIRESTORE DATABASE SYNC ---
-        function startRealtimeSync() {
-            // Unsubscribe from any previous listeners just in case
-            if (unsubscribeFirestore) unsubscribeFirestore();
+        // --- CONVEX DATABASE SYNC ---
+        window.startRealtimeSync = function() {
+            if (unsubscribeConvex) unsubscribeConvex();
 
-            // Listen to 'inventory' collection, ordered by creation time
-            unsubscribeFirestore = db.collection('inventory')
-                .orderBy('createdAt', 'desc')
-                .onSnapshot(snapshot => {
-                    records = []; // Reset local array
-                    snapshot.forEach(doc => {
-                        let data = doc.data();
-                        data.id = doc.id; // Assign Firestore document ID
-                        records.push(data);
-                    });
-                    
-                    updateDataLists();
-                    renderTable();
-                }, error => {
-                    console.error("Firestore Error: ", error);
-                    alert("Error loading data. Make sure Firestore rules are set correctly.");
-                });
+            unsubscribeConvex = convex.onUpdate("inventory:list", { userId: currentUserId }, (data) => {
+                records = data.map(d => ({ ...d, id: d._id }));
+                updateDataLists();
+                renderTable();
+            }, (error) => {
+                console.error("Convex Error: ", error);
+                alert("Error loading data.");
+            });
         }
 
 
         // --- MAIN APP UI LOGIC ---
-        function switchTab(tab) {
+        window.switchTab = function(tab) {
             document.querySelectorAll('.section-card').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.btn-tab').forEach(el => el.classList.remove('active'));
             if(tab === 'add') {
@@ -540,7 +538,7 @@ appId: "1:81459501866:web:231e90cbbd55c1960c5c53"
             }
         }
 
-        function saveRecord(e) {
+        window.saveRecord = async function(e) {
             e.preventDefault(); 
             
             let k1 = document.getElementById('key1').value.trim();
@@ -558,35 +556,38 @@ appId: "1:81459501866:web:231e90cbbd55c1960c5c53"
             let prodVal = document.getElementById('productName').value;
             let serialVal = document.getElementById('serialNo').value.trim();
 
-            // Add each key as a separate document in Firestore
-            validKeys.forEach(singleKey => {
-                db.collection('inventory').add({
-                    purchaseDate: purDate,
-                    date: saleDate, 
-                    name: nameVal,
-                    mobile: mobVal,
-                    vendor: vendorVal,
-                    product: prodVal,
-                    serial: serialVal,
-                    key: singleKey, 
-                    addedBy: currentUser,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp() // Timestamp for sorting
-                });
-            });
+            try {
+                for (let singleKey of validKeys) {
+                    await convex.mutation("inventory:add", {
+                        userId: currentUserId,
+                        purchaseDate: purDate,
+                        date: saleDate, 
+                        name: nameVal,
+                        mobile: mobVal,
+                        vendor: vendorVal,
+                        product: prodVal,
+                        serial: serialVal,
+                        key: singleKey
+                    });
+                }
 
-            alert(`Successfully added ${validKeys.length} key(s) to inventory!`);
-            
-            document.getElementById('key1').value = '';
-            document.getElementById('key2').value = '';
-            document.getElementById('key3').value = '';
-            document.getElementById('serialNo').value = '';
-            document.getElementById('custName').value = '';
-            document.getElementById('mobile').value = '';
-            document.getElementById('saleDate').value = '';
-            document.getElementById('key1').focus(); 
+                alert(`Successfully added ${validKeys.length} key(s) to inventory!`);
+                
+                document.getElementById('key1').value = '';
+                document.getElementById('key2').value = '';
+                document.getElementById('key3').value = '';
+                document.getElementById('serialNo').value = '';
+                document.getElementById('custName').value = '';
+                document.getElementById('mobile').value = '';
+                document.getElementById('saleDate').value = '';
+                document.getElementById('key1').focus(); 
+            } catch (error) {
+                console.error("Error adding records", error);
+                alert("Failed to add records.");
+            }
         }
 
-        function renderTable() {
+        window.renderTable = function() {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = "";
 
@@ -599,7 +600,6 @@ appId: "1:81459501866:web:231e90cbbd55c1960c5c53"
 
             let srNoCounter = 1; 
 
-            // records array is already sorted newest first by Firestore
             records.forEach(rec => {
                 let isSold = rec.name && rec.name.trim() !== "";
                 
@@ -646,7 +646,7 @@ appId: "1:81459501866:web:231e90cbbd55c1960c5c53"
         }
 
         // --- FULL EDIT MODAL LOGIC ---
-        function openEditModal(id) {
+        window.openEditModal = function(id) {
             let rec = records.find(r => r.id == id);
             if(!rec) return;
 
@@ -672,34 +672,35 @@ appId: "1:81459501866:web:231e90cbbd55c1960c5c53"
             document.getElementById('editModal').style.display = 'flex';
         }
 
-        function closeEditModal() {
+        window.closeEditModal = function() {
             document.getElementById('editModal').style.display = 'none';
         }
 
-        function saveEditRecord(e) {
+        window.saveEditRecord = async function(e) {
             e.preventDefault();
             let id = document.getElementById('editRecordId').value;
             
-            // Update document in Firestore directly
-            db.collection('inventory').doc(id).update({
-                product: document.getElementById('editProduct').value,
-                key: document.getElementById('editKey').value.trim(),
-                purchaseDate: document.getElementById('editPurchaseDate').value,
-                vendor: document.getElementById('editVendor').value.trim(),
-                serial: document.getElementById('editSerialNo').value.trim(),
-                name: document.getElementById('editCustName').value.trim(),
-                mobile: document.getElementById('editMobile').value.trim(),
-                date: document.getElementById('editSaleDate').value 
-            }).then(() => {
+            try {
+                await convex.mutation("inventory:update", {
+                    id: id,
+                    userId: currentUserId,
+                    product: document.getElementById('editProduct').value,
+                    key: document.getElementById('editKey').value.trim(),
+                    purchaseDate: document.getElementById('editPurchaseDate').value,
+                    vendor: document.getElementById('editVendor').value.trim(),
+                    serial: document.getElementById('editSerialNo').value.trim(),
+                    name: document.getElementById('editCustName').value.trim(),
+                    mobile: document.getElementById('editMobile').value.trim(),
+                    date: document.getElementById('editSaleDate').value 
+                });
                 closeEditModal();
-                // renderTable is automatically called via onSnapshot
-            }).catch(error => {
+            } catch (error) {
                 console.error("Error updating document: ", error);
                 alert("Failed to update record.");
-            });
+            }
         }
 
-        function clearFilters() {
+        window.clearFilters = function() {
             document.getElementById('searchBar').value = "";
             document.getElementById('filterStatus').value = "ALL";
             document.getElementById('filterProduct').value = "ALL"; 
@@ -709,7 +710,7 @@ appId: "1:81459501866:web:231e90cbbd55c1960c5c53"
             renderTable();
         }
 
-        function sendWhatsApp(id) {
+        window.sendWhatsApp = function(id) {
             let rec = records.find(r => r.id == id);
             if(!rec.mobile) return alert("Please add the customer's mobile number first.");
 
@@ -723,24 +724,24 @@ appId: "1:81459501866:web:231e90cbbd55c1960c5c53"
             window.open(`https://wa.me/${phone}?text=${encodedMsg}`, '_blank');
         }
 
-        function deleteRecord(id) {
+        window.deleteRecord = async function(id) {
             if(confirm("Are you sure you want to completely delete this row?")) {
-                // Delete from Firestore directly
-                db.collection('inventory').doc(id).delete().catch(error => {
+                try {
+                    await convex.mutation("inventory:remove", { id: id, userId: currentUserId });
+                } catch (error) {
                     console.error("Error removing document: ", error);
                     alert("Failed to delete record.");
-                });
+                }
             }
         }
 
-        function exportToCSV() {
+        window.exportToCSV = function() {
             if(records.length === 0) return alert("No data to export!");
             let csvContent = "data:text/csv;charset=utf-8,";
             csvContent += "Sr. No,Status,Product Name,License Key,Customer Name,Mobile,Purchase Date,Sale Date,Vendor,Serial Number\n"; 
 
             let rowCounter = 1;
 
-            // Use the currently reversed array to match table logic
             let exportRecords = [...records].reverse();
 
             exportRecords.forEach(function(r) {
@@ -776,6 +777,9 @@ appId: "1:81459501866:web:231e90cbbd55c1960c5c53"
             document.body.appendChild(link);
             link.click(); document.body.removeChild(link); 
         }
+
+        // Initialize Check
+        checkAuthState();
 
     </script>
 </body>

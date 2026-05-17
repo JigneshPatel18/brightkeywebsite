@@ -1,0 +1,11 @@
+{
+  "name": "bright-inventory",
+  "version": "1.0.0",
+  "description": "Bright Inventory with Convex DB",
+  "scripts": {
+    "build": "echo 'No build step for static HTML'"
+  },
+  "dependencies": {
+    "convex": "^1.11.3"
+  }
+}

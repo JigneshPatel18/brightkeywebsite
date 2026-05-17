@@ -4,7 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BRIGHT Inventory & Sales Tracker</title>
+    
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- FIREBASE SDKS (v8 Compat for simple single-file integration) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
     <style>
         :root {
             --primary: #2e7d32; 
@@ -368,19 +376,29 @@
         </div>
     </div>
 
+    <!-- MAIN JAVASCRIPT & FIREBASE INTEGRATION -->
     <script>
-        // Data Initialization
-        let records = JSON.parse(localStorage.getItem('keyTrackerData')) || [];
-        let usersDB = JSON.parse(localStorage.getItem('keyTrackerUsers')) || [];
-        let currentUser = null;
+        // =========================================================
+        // FIREBASE CONFIGURATION (REPLACE WITH YOUR ACTUAL KEYS)
+        // =========================================================
+      const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "...",
+  projectId: "...",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
+};
 
-        // Backward compatibility mapping for old records
-        records = records.map(r => {
-            if(!r.id) r.id = Date.now() + Math.random(); 
-            if(r.keys && !r.key) r.key = r.keys; 
-            if(!r.purchaseDate) r.purchaseDate = r.date || ''; 
-            return r;
-        });
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Local State
+        let records = [];
+        let currentUser = null;
+        let unsubscribeFirestore = null;
 
         // "ENTER" KEY NAVIGATION LOGIC
         const enterNavInputs = document.querySelectorAll('.enter-nav');
@@ -406,7 +424,7 @@
             document.getElementById('customerList').innerHTML = names.map(n => `<option value="${n}">`).join('');
         }
 
-        // --- AUTHENTICATION WITH GMAIL ---
+        // --- AUTHENTICATION (FIREBASE) ---
         function showMessage(text, isError = true) {
             const msgBox = document.getElementById('auth-msg');
             msgBox.style.display = 'block'; msgBox.textContent = text;
@@ -426,6 +444,28 @@
             }
         }
 
+        // Real-time Auth State Listener (Handles Persistent Login Automatically)
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user.email;
+                let displayName = currentUser.split('@')[0];
+                document.getElementById('welcome-user').textContent = "User: " + displayName;
+                
+                document.getElementById('auth-page').style.display = 'none';
+                document.getElementById('app-page').style.display = 'flex';
+                document.getElementById('purchaseDate').valueAsDate = new Date(); // Set today's date
+                
+                startRealtimeSync(); // Load Firestore Data
+            } else {
+                currentUser = null;
+                records = []; // Clear local array
+                if (unsubscribeFirestore) unsubscribeFirestore(); // Stop syncing
+                
+                document.getElementById('app-page').style.display = 'none';
+                document.getElementById('auth-page').style.display = 'flex';
+            }
+        });
+
         function signup() {
             const email = document.getElementById('signup-email').value.trim();
             const p1 = document.getElementById('signup-pass').value.trim();
@@ -433,17 +473,16 @@
 
             if(!email || !p1 || !p2) return showMessage("Please fill in all fields.");
             if(p1 !== p2) return showMessage("Passwords do not match!");
-            if(usersDB.find(user => user.email === email)) return showMessage("Gmail ID already exists.");
 
-            usersDB.push({ email: email, password: p1 });
-            localStorage.setItem('keyTrackerUsers', JSON.stringify(usersDB));
-            
-            document.getElementById('signup-email').value = '';
-            document.getElementById('signup-pass').value = '';
-            document.getElementById('signup-pass-confirm').value = '';
-
-            showMessage("Account created! Please Sign In.", false);
-            switchAuthTab('login');
+            auth.createUserWithEmailAndPassword(email, p1)
+                .then((userCredential) => {
+                    document.getElementById('signup-email').value = '';
+                    document.getElementById('signup-pass').value = '';
+                    document.getElementById('signup-pass-confirm').value = '';
+                })
+                .catch((error) => {
+                    showMessage(error.message);
+                });
         }
 
         function login() {
@@ -451,55 +490,50 @@
             const p = document.getElementById('login-pass').value.trim();
             if(!email || !p) return showMessage("Please enter Gmail ID and Password.");
 
-            const validUser = usersDB.find(user => user.email === email && user.password === p);
-            
-            if(validUser) {
-                processLogin(validUser.email);
-            } else { 
-                showMessage("Incorrect Gmail ID or Password!"); 
-            }
-        }
-
-        function processLogin(email) {
-            currentUser = email;
-            localStorage.setItem('brightSession', currentUser); // Remember me forever
-            
-            // Just display the first part of the email nicely
-            let displayName = currentUser.split('@')[0];
-            document.getElementById('welcome-user').textContent = "User: " + displayName;
-            
-            document.getElementById('auth-page').style.display = 'none';
-            document.getElementById('app-page').style.display = 'flex';
-            
-            document.getElementById('purchaseDate').valueAsDate = new Date(); // Set today's date
-            updateDataLists();
-            renderTable();
+            auth.signInWithEmailAndPassword(email, p)
+                .catch((error) => {
+                    showMessage("Incorrect Gmail ID or Password!");
+                });
         }
 
         function logout() {
-            currentUser = null;
-            localStorage.removeItem('brightSession'); // Clear Remember Me
-            document.getElementById('app-page').style.display = 'none';
-            document.getElementById('auth-page').style.display = 'flex';
+            auth.signOut();
             document.getElementById('login-pass').value = '';
         }
 
-        // Check if already logged in previously
-        window.onload = function() {
-            let sessionUser = localStorage.getItem('brightSession');
-            if(sessionUser) {
-                processLogin(sessionUser);
-            }
-        };
+        // --- FIRESTORE DATABASE SYNC ---
+        function startRealtimeSync() {
+            // Unsubscribe from any previous listeners just in case
+            if (unsubscribeFirestore) unsubscribeFirestore();
 
-        // --- MAIN APP ---
+            // Listen to 'inventory' collection, ordered by creation time
+            unsubscribeFirestore = db.collection('inventory')
+                .orderBy('createdAt', 'desc')
+                .onSnapshot(snapshot => {
+                    records = []; // Reset local array
+                    snapshot.forEach(doc => {
+                        let data = doc.data();
+                        data.id = doc.id; // Assign Firestore document ID
+                        records.push(data);
+                    });
+                    
+                    updateDataLists();
+                    renderTable();
+                }, error => {
+                    console.error("Firestore Error: ", error);
+                    alert("Error loading data. Make sure Firestore rules are set correctly.");
+                });
+        }
+
+
+        // --- MAIN APP UI LOGIC ---
         function switchTab(tab) {
             document.querySelectorAll('.section-card').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.btn-tab').forEach(el => el.classList.remove('active'));
             if(tab === 'add') {
                 document.getElementById('section-add').classList.add('active');
                 document.querySelectorAll('.btn-tab')[0].classList.add('active');
-                document.getElementById('productName').focus(); // Auto focus
+                document.getElementById('productName').focus(); 
             } else {
                 document.getElementById('section-view').classList.add('active');
                 document.querySelectorAll('.btn-tab')[1].classList.add('active');
@@ -525,9 +559,9 @@
             let prodVal = document.getElementById('productName').value;
             let serialVal = document.getElementById('serialNo').value.trim();
 
+            // Add each key as a separate document in Firestore
             validKeys.forEach(singleKey => {
-                records.push({
-                    id: Date.now() + Math.random(), 
+                db.collection('inventory').add({
                     purchaseDate: purDate,
                     date: saleDate, 
                     name: nameVal,
@@ -536,13 +570,11 @@
                     product: prodVal,
                     serial: serialVal,
                     key: singleKey, 
-                    addedBy: currentUser
+                    addedBy: currentUser,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp() // Timestamp for sorting
                 });
             });
 
-            localStorage.setItem('keyTrackerData', JSON.stringify(records)); 
-            updateDataLists(); 
-            
             alert(`Successfully added ${validKeys.length} key(s) to inventory!`);
             
             document.getElementById('key1').value = '';
@@ -568,10 +600,8 @@
 
             let srNoCounter = 1; 
 
-            // Sort by Purchase Date (Newest first)
-            let sortedRecords = [...records].reverse();
-
-            sortedRecords.forEach(rec => {
+            // records array is already sorted newest first by Firestore
+            records.forEach(rec => {
                 let isSold = rec.name && rec.name.trim() !== "";
                 
                 if(fStatus === 'STOCK' && isSold) return;
@@ -622,8 +652,8 @@
             if(!rec) return;
 
             document.getElementById('editRecordId').value = rec.id;
-            document.getElementById('editProduct').value = rec.product;
-            document.getElementById('editKey').value = rec.key;
+            document.getElementById('editProduct').value = rec.product || '';
+            document.getElementById('editKey').value = rec.key || '';
             document.getElementById('editPurchaseDate').value = rec.purchaseDate || '';
             document.getElementById('editVendor').value = rec.vendor || '';
             document.getElementById('editSerialNo').value = rec.serial || '';
@@ -650,22 +680,24 @@
         function saveEditRecord(e) {
             e.preventDefault();
             let id = document.getElementById('editRecordId').value;
-            let index = records.findIndex(r => r.id == id);
-            if(index === -1) return;
-
-            records[index].product = document.getElementById('editProduct').value;
-            records[index].key = document.getElementById('editKey').value.trim();
-            records[index].purchaseDate = document.getElementById('editPurchaseDate').value;
-            records[index].vendor = document.getElementById('editVendor').value.trim();
-            records[index].serial = document.getElementById('editSerialNo').value.trim();
-            records[index].name = document.getElementById('editCustName').value.trim();
-            records[index].mobile = document.getElementById('editMobile').value.trim();
-            records[index].date = document.getElementById('editSaleDate').value; 
-
-            localStorage.setItem('keyTrackerData', JSON.stringify(records));
-            updateDataLists();
-            closeEditModal();
-            renderTable();
+            
+            // Update document in Firestore directly
+            db.collection('inventory').doc(id).update({
+                product: document.getElementById('editProduct').value,
+                key: document.getElementById('editKey').value.trim(),
+                purchaseDate: document.getElementById('editPurchaseDate').value,
+                vendor: document.getElementById('editVendor').value.trim(),
+                serial: document.getElementById('editSerialNo').value.trim(),
+                name: document.getElementById('editCustName').value.trim(),
+                mobile: document.getElementById('editMobile').value.trim(),
+                date: document.getElementById('editSaleDate').value 
+            }).then(() => {
+                closeEditModal();
+                // renderTable is automatically called via onSnapshot
+            }).catch(error => {
+                console.error("Error updating document: ", error);
+                alert("Failed to update record.");
+            });
         }
 
         function clearFilters() {
@@ -694,9 +726,11 @@
 
         function deleteRecord(id) {
             if(confirm("Are you sure you want to completely delete this row?")) {
-                records = records.filter(r => r.id != id);
-                localStorage.setItem('keyTrackerData', JSON.stringify(records));
-                renderTable();
+                // Delete from Firestore directly
+                db.collection('inventory').doc(id).delete().catch(error => {
+                    console.error("Error removing document: ", error);
+                    alert("Failed to delete record.");
+                });
             }
         }
 
@@ -705,10 +739,12 @@
             let csvContent = "data:text/csv;charset=utf-8,";
             csvContent += "Sr. No,Status,Product Name,License Key,Customer Name,Mobile,Purchase Date,Sale Date,Vendor,Serial Number\n"; 
 
-            const tableRows = document.querySelectorAll("#tableBody tr");
             let rowCounter = 1;
 
-            records.reverse().forEach(function(r) {
+            // Use the currently reversed array to match table logic
+            let exportRecords = [...records].reverse();
+
+            exportRecords.forEach(function(r) {
                 let isSold = r.name ? "SOLD" : "IN STOCK";
                 
                 const fStatus = document.getElementById('filterStatus').value;
@@ -733,7 +769,6 @@
                 csvContent += row + "\r\n";
                 rowCounter++;
             });
-            records.reverse(); 
 
             var encodedUri = encodeURI(csvContent);
             var link = document.createElement("a");
@@ -745,4 +780,4 @@
 
     </script>
 </body>
-</html>
+</html>aaaaaaa

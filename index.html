@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BRIGHT Inventory & Sales Tracker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2e7d32; 
+            --primary-light: #e8f5e9;
+            --secondary: #3A4B86; /* Updated to match logo blue */
+            --dark: #333;
+            --light: #f4f6f9;
+            --white: #fff;
+            --danger: #d32f2f;
+            --whatsapp: #25D366;
+            --success: #388e3c;
+            --warning: #f57c00;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--light); color: var(--dark); }
+
+        /* --- LOGO STYLES --- */
+        .brand-logo { max-width: 160px; display: block; margin: 0 auto 15px auto; border-radius: 4px;}
+        .header-logo { height: 35px; border-radius: 3px; }
+
+        /* --- AUTH PAGE --- */
+        #auth-page { height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #000, var(--secondary)); }
+        .auth-box { background: var(--white); padding: 40px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; max-width: 400px; text-align: center; }
+        .auth-tabs { display: flex; margin-bottom: 25px; border-bottom: 2px solid #ddd; }
+        .auth-tab { flex: 1; padding: 10px; background: none; border: none; font-size: 16px; font-weight: bold; color: #777; cursor: pointer; }
+        .auth-tab.active { color: var(--secondary); border-bottom: 3px solid var(--secondary); margin-bottom: -2px; }
+        .auth-form { display: none; }
+        .auth-form.active { display: block; }
+        .auth-box h2 { margin-bottom: 20px; color: var(--secondary); font-size: 1.5rem; }
+        .input-group { margin-bottom: 15px; text-align: left; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px;}
+        .input-group input, .input-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 15px; background: white;}
+        .btn-auth { width: 100%; padding: 12px; background: var(--secondary); color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; margin-top: 10px;}
+        .btn-auth:hover { background: #2c3a6b; }
+        .msg-box { margin-top: 15px; font-size: 14px; display: none; padding: 10px; border-radius: 5px; }
+        .msg-error { background: #ffebee; color: var(--danger); border: 1px solid #ffcdd2; }
+        .msg-success { background: #e8f5e9; color: var(--success); border: 1px solid #c8e6c9; }
+
+        /* --- MAIN APP --- */
+        #app-page { display: none; height: 100vh; flex-direction: column; }
+        header { background: #000; padding: 12px 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: flex; justify-content: space-between; align-items: center; z-index: 10; border-bottom: 3px solid var(--warning); }
+        .brand { font-size: 20px; font-weight: bold; color: white; display: flex; align-items: center; gap: 12px;}
+        .nav-actions button { margin-left: 10px; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-logout { background: var(--danger); color: white; }
+        .btn-tab { background: #444; color: white; }
+        .btn-tab.active { background: var(--secondary); color: white; }
+        .content { padding: 20px; overflow-y: auto; flex: 1; }
+        .section-card { background: var(--white); padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; display: none; }
+        .section-card.active { display: block; }
+        .section-title { border-bottom: 2px solid var(--primary-light); padding-bottom: 10px; margin-bottom: 20px; color: var(--secondary); }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 15px; }
+        .form-grid .input-group { margin-bottom: 0; }
+        .btn-submit { background: var(--secondary); color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 20px; width: 100%;}
+        
+        /* Keys Area */
+        .keys-container { grid-column: 1 / -1; background: #fff3e0; border: 1px solid #ffe0b2; padding: 15px; border-radius: 8px; margin-top: 10px;}
+        .keys-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 10px;}
+        .optional-label { font-size: 12px; color: #888; font-weight: normal; }
+
+        /* Table Area Filters */
+        .filters-container { background: #f0f4f8; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #d9e2ec; }
+        .filters { display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;}
+        .filters .input-group { flex: 1; min-width: 150px; }
+        .btn-export { background: var(--secondary); color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        
+        /* Table Styles */
+        table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+        th, td { border: 1px solid #ddd; padding: 10px 8px; text-align: left; vertical-align: middle;}
+        th { background-color: var(--secondary); color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        tr:hover { background-color: #f1f1f1; }
+        
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .badge-stock { background: #e8f5e9; color: var(--success); border: 1px solid var(--success);}
+        .badge-sold { background: #ffebee; color: var(--danger); border: 1px solid var(--danger);}
+
+        .action-btns { display: flex; gap: 5px; flex-direction: column; }
+        .btn-sm { padding: 6px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; color: white; font-weight: bold;}
+        .btn-wa { background: var(--whatsapp); }
+        .btn-edit { background: var(--secondary); }
+        .btn-del { background: var(--danger); }
+        .key-text { color: var(--primary); font-family: monospace; font-size: 14px; font-weight: bold; background: #e8eaf6; padding: 4px; border-radius: 3px; display: inline-block; word-break: break-all;}
+
+        /* --- MODAL (POPUP) STYLES FOR EDITING --- */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; width: 90%; max-width: 800px; border-radius: 10px; padding: 25px; box-shadow: 0 15px 30px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-light); padding-bottom: 10px; margin-bottom: 20px; }
+        .modal-header h2 { color: var(--secondary); }
+        .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--danger); }
+
+        /* --- PRINT CSS --- */
+        @media print {
+            body { background: white; }
+            header, .filters-container, .action-btns, button, .modal-overlay { display: none !important; }
+            #app-page { height: auto; }
+            .content { padding: 0; }
+            .section-card { box-shadow: none; border: none; margin: 0; padding: 0; }
+            .section-title { text-align: center; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 15px; color: #000; }
+            table { font-size: 11px; }
+            th { background-color: #ddd !important; color: #000 !important; -webkit-print-color-adjust: exact; }
+            th:last-child, td:last-child { display: none; } 
+        }
+    </style>
+</head>
+<body>
+
+    <!-- DATALISTS FOR AUTO-SUGGESTION -->
+    <datalist id="vendorList"></datalist>
+    <datalist id="customerList"></datalist>
+
+    <!-- AUTHENTICATION PAGE -->
+    <div id="auth-page">
+        <div class="auth-box">
+            <img src="input_file_0.jpeg" alt="BRIGHT Logo" class="brand-logo" onerror="this.style.display='none'">
+            <h2>BRIGHT INVENTORY</h2>
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchAuthTab('login')">Login</button>
+                <button class="auth-tab" onclick="switchAuthTab('signup')">Sign Up</button>
+            </div>
+            <!-- LOGIN FORM -->
+            <div id="form-login" class="auth-form active">
+                <div class="input-group"><label>Username</label><input type="text" id="login-user" placeholder="Enter Username"></div>
+                <div class="input-group"><label>Password</label><input type="password" id="login-pass" placeholder="Enter Password"></div>
+                <button class="btn-auth" onclick="login()"><i class="fa-solid fa-right-to-bracket"></i> SECURE LOGIN</button>
+            </div>
+            <!-- SIGN UP FORM -->
+            <div id="form-signup" class="auth-form">
+                <div class="input-group"><label>Create Username</label><input type="text" id="signup-user" placeholder="Choose a Username"></div>
+                <div class="input-group"><label>Create Password</label><input type="password" id="signup-pass" placeholder="Create a Password"></div>
+                <div class="input-group"><label>Confirm Password</label><input type="password" id="signup-pass-confirm" placeholder="Type Password Again"></div>
+                <button class="btn-auth" onclick="signup()"><i class="fa-solid fa-user-plus"></i> CREATE ACCOUNT</button>
+            </div>
+            <div id="auth-msg" class="msg-box"></div>
+        </div>
+    </div>
+
+    <!-- MAIN APP DASHBOARD -->
+    <div id="app-page">
+        <header>
+            <div class="brand">
+                <img src="input_file_0.jpeg" alt="Logo" class="header-logo" onerror="this.style.display='none'"> 
+                BRIGHT Tracker
+            </div>
+            <div class="nav-actions">
+                <span id="welcome-user" style="margin-right: 15px; font-weight: bold; color: var(--warning);"></span>
+                <button class="btn-tab active" onclick="switchTab('add')"><i class="fa-solid fa-plus"></i> Add to Stock</button>
+                <button class="btn-tab" onclick="switchTab('view')"><i class="fa-solid fa-table"></i> Inventory & Sales</button>
+                <button class="btn-logout" onclick="logout()"><i class="fa-solid fa-power-off"></i> Logout</button>
+            </div>
+        </header>
+
+        <div class="content">
+            <!-- ADD RECORD SECTION -->
+            <div id="section-add" class="section-card active">
+                <h2 class="section-title">Add Keys to Inventory</h2>
+                <form id="keyForm" onsubmit="saveRecord(event)">
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label>Product Name <span style="color:red">*</span></label>
+                            <select id="productName" class="enter-nav" required>
+                                <option value="">-- Select Product --</option>
+                                <option value="Quick Heal Antivirus Pro 1 User 1 Year">Quick Heal Antivirus Pro - 1 User 1 Year</option>
+                                <option value="Quick Heal Antivirus Pro 1 User 3 Years">Quick Heal Antivirus Pro - 1 User 3 Years</option>
+                                <option value="Quick Heal Internet Security 1 User 1 Year">Quick Heal Internet Security - 1 User 1 Year</option>
+                                <option value="Quick Heal Internet Security 1 User 3 Years">Quick Heal Internet Security - 1 User 3 Years</option>
+                                <option value="Quick Heal Total Security 1 User 1 Year">Quick Heal Total Security - 1 User 1 Year</option>
+                                <option value="Quick Heal Total Security 1 User 3 Years">Quick Heal Total Security - 1 User 3 Years</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Purchase Date <span style="color:red">*</span></label>
+                            <input type="date" id="purchaseDate" class="enter-nav" required>
+                        </div>
+                        <div class="input-group">
+                            <label>Purchased From / Vendor <span style="color:red">*</span></label>
+                            <input type="text" id="vendor" class="enter-nav" list="vendorList" placeholder="Start typing to auto-suggest" required>
+                        </div>
+                        <div class="input-group">
+                            <label>Serial Number <span class="optional-label">(Optional)</span></label>
+                            <input type="text" id="serialNo" class="enter-nav" placeholder="Product Serial Number">
+                        </div>
+                        
+                        <div class="input-group">
+                            <label>Customer Name <span class="optional-label">(Leave blank for stock)</span></label>
+                            <input type="text" id="custName" class="enter-nav" list="customerList" placeholder="Start typing to auto-suggest">
+                        </div>
+                        <div class="input-group">
+                            <label>Customer Mobile <span class="optional-label">(Leave blank for stock)</span></label>
+                            <input type="text" id="mobile" class="enter-nav" placeholder="e.g. 9978257960">
+                        </div>
+                        <div class="input-group">
+                            <label>Sale Date <span class="optional-label">(Leave blank for stock)</span></label>
+                            <input type="date" id="saleDate" class="enter-nav">
+                        </div>
+
+                        <!-- Keys input -->
+                        <div class="keys-container">
+                            <label style="font-weight: bold; color: var(--warning);"><i class="fa-solid fa-key"></i> Enter License Keys</label>
+                            <p style="font-size: 13px; color: #555; margin-bottom: 10px;">Each key will automatically be saved as a <b>separate row</b>.</p>
+                            <div class="keys-grid">
+                                <input type="text" id="key1" class="enter-nav" placeholder="Key 1 (Required)" required>
+                                <input type="text" id="key2" class="enter-nav" placeholder="Key 2 (Optional)">
+                                <input type="text" id="key3" class="enter-nav" placeholder="Key 3 (Optional)">
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" id="btnSubmitForm" class="btn-submit"><i class="fa-solid fa-save"></i> Save Keys to Inventory</button>
+                </form>
+            </div>
+
+            <!-- VIEW RECORDS SECTION -->
+            <div id="section-view" class="section-card">
+                <h2 class="section-title">Stock & Sales Tracker</h2>
+                
+                <div class="filters-container">
+                    <div class="filters" style="margin-bottom: 15px;">
+                        <div class="input-group" style="flex: 1; min-width: 100%;">
+                            <label><i class="fa-solid fa-magnifying-glass"></i> Search Anything (Name, Key, Mobile, Vendor, S.N)</label>
+                            <input type="text" id="searchBar" placeholder="Type here to search instantly..." onkeyup="renderTable()" style="border: 2px solid var(--secondary);">
+                        </div>
+                    </div>
+
+                    <div class="filters">
+                        <div class="input-group" style="min-width: 120px;">
+                            <label>Status</label>
+                            <select id="filterStatus" onchange="renderTable()">
+                                <option value="ALL">Show All</option>
+                                <option value="STOCK">In Stock</option>
+                                <option value="SOLD">Sold</option>
+                            </select>
+                        </div>
+                        <div class="input-group" style="min-width: 200px;">
+                            <label>Product Filter</label>
+                            <select id="filterProduct" onchange="renderTable()">
+                                <option value="ALL">All Products</option>
+                                <option value="Quick Heal Antivirus Pro 1 User 1 Year">Antivirus Pro 1U 1Y</option>
+                                <option value="Quick Heal Antivirus Pro 1 User 3 Years">Antivirus Pro 1U 3Y</option>
+                                <option value="Quick Heal Internet Security 1 User 1 Year">Internet Security 1U 1Y</option>
+                                <option value="Quick Heal Internet Security 1 User 3 Years">Internet Security 1U 3Y</option>
+                                <option value="Quick Heal Total Security 1 User 1 Year">Total Security 1U 1Y</option>
+                                <option value="Quick Heal Total Security 1 User 3 Years">Total Security 1U 3Y</option>
+                            </select>
+                        </div>
+                        <div class="input-group" style="min-width: 130px;">
+                            <label>Sale Date From</label>
+                            <input type="date" id="dateFrom" onchange="renderTable()">
+                        </div>
+                        <div class="input-group" style="min-width: 130px;">
+                            <label>Sale Date To</label>
+                            <input type="date" id="dateTo" onchange="renderTable()">
+                        </div>
+                        <div class="input-group" style="min-width: 150px;">
+                            <label>Specific Month</label>
+                            <input type="month" id="filterMonth" onchange="renderTable()">
+                        </div>
+                    </div>
+
+                    <div class="filters" style="margin-top: 15px; justify-content: flex-end;">
+                        <button class="btn-export" onclick="clearFilters()" style="background-color: #7f8c8d;"><i class="fa-solid fa-rotate-right"></i> Reset Filters</button>
+                        <button class="btn-export" onclick="exportToCSV()"><i class="fa-solid fa-file-csv"></i> Download CSV/Excel</button>
+                        <button class="btn-export" onclick="window.print()" style="background-color: #d35400;"><i class="fa-solid fa-print"></i> Print / PDF</button>
+                    </div>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Sr. No.</th>
+                                <th>Status</th>
+                                <th>Product</th>
+                                <th>License Key</th>
+                                <th>Customer Details</th>
+                                <th>Pur. Date</th>
+                                <th>Sale Date</th>
+                                <th>Vendor & S.N</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- Data injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FULL EDIT MODAL POPUP -->
+    <div id="editModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-pen-to-square"></i> Edit Full Record</h2>
+                <button class="close-btn" onclick="closeEditModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="editForm" onsubmit="saveEditRecord(event)">
+                <input type="hidden" id="editRecordId">
+                <div class="form-grid">
+                    <div class="input-group">
+                        <label>Product Name</label>
+                        <select id="editProduct" required>
+                            <option value="Quick Heal Antivirus Pro 1 User 1 Year">Quick Heal Antivirus Pro - 1 User 1 Year</option>
+                            <option value="Quick Heal Antivirus Pro 1 User 3 Years">Quick Heal Antivirus Pro - 1 User 3 Years</option>
+                            <option value="Quick Heal Internet Security 1 User 1 Year">Quick Heal Internet Security - 1 User 1 Year</option>
+                            <option value="Quick Heal Internet Security 1 User 3 Years">Quick Heal Internet Security - 1 User 3 Years</option>
+                            <option value="Quick Heal Total Security 1 User 1 Year">Quick Heal Total Security - 1 User 1 Year</option>
+                            <option value="Quick Heal Total Security 1 User 3 Years">Quick Heal Total Security - 1 User 3 Years</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>License Key</label>
+                        <input type="text" id="editKey" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Purchase Date</label>
+                        <input type="date" id="editPurchaseDate" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Purchased From / Vendor</label>
+                        <input type="text" id="editVendor" list="vendorList" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Serial Number</label>
+                        <input type="text" id="editSerialNo">
+                    </div>
+                    <div class="input-group">
+                        <label>Customer Name</label>
+                        <input type="text" id="editCustName" list="customerList">
+                    </div>
+                    <div class="input-group">
+                        <label>Customer Mobile</label>
+                        <input type="text" id="editMobile">
+                    </div>
+                    <div class="input-group">
+                        <label>Sale Date</label>
+                        <input type="date" id="editSaleDate">
+                    </div>
+                </div>
+                <button type="submit" class="btn-submit"><i class="fa-solid fa-check"></i> Update Record</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Data Initialization
+        let records = JSON.parse(localStorage.getItem('keyTrackerData')) || [];
+        let usersDB = JSON.parse(localStorage.getItem('keyTrackerUsers')) || [];
+        let currentUser = null;
+
+        // Backward compatibility mapping for old records
+        records = records.map(r => {
+            if(!r.id) r.id = Date.now() + Math.random(); 
+            if(r.keys && !r.key) r.key = r.keys; 
+            if(!r.purchaseDate) r.purchaseDate = r.date || ''; // Map old date to purchase if missing
+            return r;
+        });
+
+        // "ENTER" KEY NAVIGATION LOGIC
+        const enterNavInputs = document.querySelectorAll('.enter-nav');
+        enterNavInputs.forEach((input, index) => {
+            input.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault(); // Stop default form submit
+                    if (index < enterNavInputs.length - 1) {
+                        enterNavInputs[index + 1].focus(); // Move to next input
+                    } else {
+                        document.getElementById('btnSubmitForm').click(); // Submit if last
+                    }
+                }
+            });
+        });
+
+        // AUTO-SUGGESTION LOGIC
+        function updateDataLists() {
+            const vendors = [...new Set(records.map(r => r.vendor).filter(Boolean))];
+            const names = [...new Set(records.map(r => r.name).filter(Boolean))];
+            
+            document.getElementById('vendorList').innerHTML = vendors.map(v => `<option value="${v}">`).join('');
+            document.getElementById('customerList').innerHTML = names.map(n => `<option value="${n}">`).join('');
+        }
+
+        // --- AUTHENTICATION ---
+        function showMessage(text, isError = true) {
+            const msgBox = document.getElementById('auth-msg');
+            msgBox.style.display = 'block'; msgBox.textContent = text;
+            msgBox.className = isError ? 'msg-box msg-error' : 'msg-box msg-success';
+            setTimeout(() => { msgBox.style.display = 'none'; }, 4000);
+        }
+
+        function switchAuthTab(tab) {
+            document.querySelectorAll('.auth-tab').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.auth-form').forEach(el => el.classList.remove('active'));
+            if(tab === 'login') {
+                document.querySelectorAll('.auth-tab')[0].classList.add('active');
+                document.getElementById('form-login').classList.add('active');
+            } else {
+                document.querySelectorAll('.auth-tab')[1].classList.add('active');
+                document.getElementById('form-signup').classList.add('active');
+            }
+        }
+
+        function signup() {
+            const u = document.getElementById('signup-user').value.trim();
+            const p1 = document.getElementById('signup-pass').value.trim();
+            const p2 = document.getElementById('signup-pass-confirm').value.trim();
+
+            if(!u || !p1 || !p2) return showMessage("Please fill in all fields.");
+            if(p1 !== p2) return showMessage("Passwords do not match!");
+            if(usersDB.find(user => user.username === u)) return showMessage("Username already exists.");
+
+            usersDB.push({ username: u, password: p1 });
+            localStorage.setItem('keyTrackerUsers', JSON.stringify(usersDB));
+            
+            document.getElementById('signup-user').value = '';
+            document.getElementById('signup-pass').value = '';
+            document.getElementById('signup-pass-confirm').value = '';
+
+            showMessage("Account created! Please Login.", false);
+            switchAuthTab('login');
+        }
+
+        function login() {
+            const u = document.getElementById('login-user').value.trim();
+            const p = document.getElementById('login-pass').value.trim();
+            if(!u || !p) return showMessage("Please enter username and password.");
+
+            const validUser = usersDB.find(user => user.username === u && user.password === p);
+            if(validUser) {
+                processLogin(validUser.username);
+            } else { showMessage("Incorrect Username or Password!"); }
+        }
+
+        function processLogin(username) {
+            currentUser = username;
+            localStorage.setItem('brightSession', currentUser); // Remember Me
+            document.getElementById('welcome-user').textContent = "User: " + currentUser;
+            document.getElementById('auth-page').style.display = 'none';
+            document.getElementById('app-page').style.display = 'flex';
+            
+            document.getElementById('purchaseDate').valueAsDate = new Date(); // Set today's date
+            updateDataLists();
+            renderTable();
+        }
+
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('brightSession'); // Clear Remember Me
+            document.getElementById('app-page').style.display = 'none';
+            document.getElementById('auth-page').style.display = 'flex';
+            document.getElementById('login-pass').value = '';
+        }
+
+        // Check if already logged in previously
+        window.onload = function() {
+            let sessionUser = localStorage.getItem('brightSession');
+            if(sessionUser) {
+                processLogin(sessionUser);
+            }
+        };
+
+        // --- MAIN APP ---
+        function switchTab(tab) {
+            document.querySelectorAll('.section-card').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.btn-tab').forEach(el => el.classList.remove('active'));
+            if(tab === 'add') {
+                document.getElementById('section-add').classList.add('active');
+                document.querySelectorAll('.btn-tab')[0].classList.add('active');
+                document.getElementById('productName').focus(); // Auto focus for easy typing
+            } else {
+                document.getElementById('section-view').classList.add('active');
+                document.querySelectorAll('.btn-tab')[1].classList.add('active');
+                renderTable();
+            }
+        }
+
+        function saveRecord(e) {
+            e.preventDefault(); 
+            
+            let k1 = document.getElementById('key1').value.trim();
+            let k2 = document.getElementById('key2').value.trim();
+            let k3 = document.getElementById('key3').value.trim();
+            let validKeys = [k1, k2, k3].filter(k => k !== "");
+
+            if(validKeys.length === 0) return alert("Please enter at least one License Key.");
+
+            let purDate = document.getElementById('purchaseDate').value;
+            let saleDate = document.getElementById('saleDate').value;
+            let nameVal = document.getElementById('custName').value.trim();
+            let mobVal = document.getElementById('mobile').value.trim();
+            let vendorVal = document.getElementById('vendor').value.trim();
+            let prodVal = document.getElementById('productName').value;
+            let serialVal = document.getElementById('serialNo').value.trim();
+
+            validKeys.forEach(singleKey => {
+                records.push({
+                    id: Date.now() + Math.random(), 
+                    purchaseDate: purDate,
+                    date: saleDate, // Using date for saleDate to keep old logic
+                    name: nameVal,
+                    mobile: mobVal,
+                    vendor: vendorVal,
+                    product: prodVal,
+                    serial: serialVal,
+                    key: singleKey, 
+                    addedBy: currentUser
+                });
+            });
+
+            localStorage.setItem('keyTrackerData', JSON.stringify(records)); 
+            updateDataLists(); // Refresh suggestions
+            
+            alert(`Successfully added ${validKeys.length} key(s) to inventory!`);
+            
+            // Clear keys, serial, and customer, keep vendor and product
+            document.getElementById('key1').value = '';
+            document.getElementById('key2').value = '';
+            document.getElementById('key3').value = '';
+            document.getElementById('serialNo').value = '';
+            document.getElementById('custName').value = '';
+            document.getElementById('mobile').value = '';
+            document.getElementById('saleDate').value = '';
+            document.getElementById('key1').focus(); // Put cursor back for fast entry
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = "";
+
+            const fStatus = document.getElementById('filterStatus').value;
+            const fProduct = document.getElementById('filterProduct').value;
+            const fMonth = document.getElementById('filterMonth').value; 
+            const fDateFrom = document.getElementById('dateFrom').value;
+            const fDateTo = document.getElementById('dateTo').value;
+            const fSearch = document.getElementById('searchBar').value.toLowerCase();
+
+            let srNoCounter = 1; // Counter for visible rows
+
+            // Sort by Purchase Date (Newest first)
+            let sortedRecords = [...records].reverse();
+
+            sortedRecords.forEach(rec => {
+                let isSold = rec.name && rec.name.trim() !== "";
+                
+                if(fStatus === 'STOCK' && isSold) return;
+                if(fStatus === 'SOLD' && !isSold) return;
+                if(fProduct !== 'ALL' && rec.product !== fProduct) return; 
+                if(fMonth && rec.date && !rec.date.startsWith(fMonth)) return; // Filters by Sale Date month
+                if(fDateFrom && rec.date && rec.date < fDateFrom) return;
+                if(fDateTo && rec.date && rec.date > fDateTo) return;
+                if(fSearch) {
+                    const searchString = `${rec.name||''} ${rec.mobile||''} ${rec.key||''} ${rec.vendor||''} ${rec.serial||''}`.toLowerCase();
+                    if(!searchString.includes(fSearch)) return;
+                }
+
+                let statusBadge = isSold ? `<span class="badge badge-sold">🔴 SOLD</span>` : `<span class="badge badge-stock">🟢 IN STOCK</span>`;
+                let custInfo = isSold ? `<b>${rec.name}</b><br><i class="fa-solid fa-phone" style="font-size:10px;"></i> ${rec.mobile || 'N/A'}` : `<span style="color:#aaa;">-</span>`;
+                
+                let pDate = rec.purchaseDate ? rec.purchaseDate : `<span style="color:#aaa;">-</span>`;
+                let sDate = rec.date ? rec.date : `<span style="color:#aaa;">-</span>`;
+                
+                let vendorInfo = `<b>${rec.vendor}</b><br><span style="font-size:11px; color:#666;">S.N: ${rec.serial || '-'}</span>`;
+                let editBtnText = isSold ? `<i class="fa-solid fa-pen"></i> Edit Full` : `<i class="fa-solid fa-user-plus"></i> Add Info`;
+                let waDisplay = isSold && rec.mobile ? 'inline-block' : 'none'; 
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><b>${srNoCounter}</b></td>
+                    <td>${statusBadge}</td>
+                    <td><strong>${rec.product}</strong></td>
+                    <td><span class="key-text">${rec.key}</span></td>
+                    <td>${custInfo}</td>
+                    <td>${pDate}</td>
+                    <td>${sDate}</td>
+                    <td>${vendorInfo}</td>
+                    <td class="action-btns">
+                        <button class="btn-sm btn-edit" onclick="openEditModal('${rec.id}')">${editBtnText}</button>
+                        <button class="btn-sm btn-wa" style="display:${waDisplay}" onclick="sendWhatsApp('${rec.id}')"><i class="fa-brands fa-whatsapp"></i> Send Key</button>
+                        <button class="btn-sm btn-del" onclick="deleteRecord('${rec.id}')"><i class="fa-solid fa-trash"></i> Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+                srNoCounter++;
+            });
+        }
+
+        // --- FULL EDIT MODAL LOGIC ---
+        function openEditModal(id) {
+            let rec = records.find(r => r.id == id);
+            if(!rec) return;
+
+            document.getElementById('editRecordId').value = rec.id;
+            document.getElementById('editProduct').value = rec.product;
+            document.getElementById('editKey').value = rec.key;
+            document.getElementById('editPurchaseDate').value = rec.purchaseDate || '';
+            document.getElementById('editVendor').value = rec.vendor || '';
+            document.getElementById('editSerialNo').value = rec.serial || '';
+            document.getElementById('editCustName').value = rec.name || '';
+            document.getElementById('editMobile').value = rec.mobile || '';
+            
+            // Auto fill today's sale date if we are just now adding a customer
+            if(!rec.date && !rec.name) {
+                let today = new Date();
+                let yyyy = today.getFullYear();
+                let mm = String(today.getMonth() + 1).padStart(2, '0');
+                let dd = String(today.getDate()).padStart(2, '0');
+                document.getElementById('editSaleDate').value = `${yyyy}-${mm}-${dd}`;
+            } else {
+                document.getElementById('editSaleDate').value = rec.date || '';
+            }
+
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        function saveEditRecord(e) {
+            e.preventDefault();
+            let id = document.getElementById('editRecordId').value;
+            let index = records.findIndex(r => r.id == id);
+            if(index === -1) return;
+
+            records[index].product = document.getElementById('editProduct').value;
+            records[index].key = document.getElementById('editKey').value.trim();
+            records[index].purchaseDate = document.getElementById('editPurchaseDate').value;
+            records[index].vendor = document.getElementById('editVendor').value.trim();
+            records[index].serial = document.getElementById('editSerialNo').value.trim();
+            records[index].name = document.getElementById('editCustName').value.trim();
+            records[index].mobile = document.getElementById('editMobile').value.trim();
+            records[index].date = document.getElementById('editSaleDate').value; // Sale date
+
+            localStorage.setItem('keyTrackerData', JSON.stringify(records));
+            updateDataLists();
+            closeEditModal();
+            renderTable();
+        }
+
+        function clearFilters() {
+            document.getElementById('searchBar').value = "";
+            document.getElementById('filterStatus').value = "ALL";
+            document.getElementById('filterProduct').value = "ALL"; 
+            document.getElementById('dateFrom').value = "";
+            document.getElementById('dateTo').value = "";
+            document.getElementById('filterMonth').value = "";
+            renderTable();
+        }
+
+        function sendWhatsApp(id) {
+            let rec = records.find(r => r.id == id);
+            if(!rec.mobile) return alert("Please add the customer's mobile number first.");
+
+            let customerName = rec.name ? rec.name : "Sir/Madam";
+            let msg = `✨ *BRIGHT FOR SOLUTIONS* ✨\n━━━━━━━━━━━━━━━━━━━━━━\n\nHello *${customerName}*, 🤝\n\nThank you for your purchase! Please find your activation details below:\n\n🛡️ *Product:* ${rec.product}\n🔑 *License Key:* *${rec.key}*\n\n_Note: Please keep this key safe for future reference._\n\nNeed technical help? Just reply to this message! 👨‍💻\n\n━━━━━━━━━━━━━━━━━━━━━━\n🙏 *Thanks for choosing us!*`;
+            
+            let encodedMsg = encodeURIComponent(msg);
+            let phone = rec.mobile.replace(/\s/g, '');
+            if(phone.length === 10) phone = "91" + phone; 
+
+            window.open(`https://wa.me/${phone}?text=${encodedMsg}`, '_blank');
+        }
+
+        function deleteRecord(id) {
+            if(confirm("Are you sure you want to completely delete this row?")) {
+                records = records.filter(r => r.id != id);
+                localStorage.setItem('keyTrackerData', JSON.stringify(records));
+                renderTable();
+            }
+        }
+
+        function exportToCSV() {
+            if(records.length === 0) return alert("No data to export!");
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Sr. No,Status,Product Name,License Key,Customer Name,Mobile,Purchase Date,Sale Date,Vendor,Serial Number\n"; 
+
+            const tableRows = document.querySelectorAll("#tableBody tr");
+            let rowCounter = 1;
+
+            records.reverse().forEach(function(r) {
+                let isSold = r.name ? "SOLD" : "IN STOCK";
+                
+                // Mirror logic from renderTable for accurate CSV export of current view
+                const fStatus = document.getElementById('filterStatus').value;
+                const fProduct = document.getElementById('filterProduct').value;
+                const fMonth = document.getElementById('filterMonth').value; 
+                const fDateFrom = document.getElementById('dateFrom').value;
+                const fDateTo = document.getElementById('dateTo').value;
+                const fSearch = document.getElementById('searchBar').value.toLowerCase();
+
+                if(fStatus === 'STOCK' && isSold === "SOLD") return;
+                if(fStatus === 'SOLD' && isSold === "IN STOCK") return;
+                if(fProduct !== 'ALL' && r.product !== fProduct) return; 
+                if(fMonth && r.date && !r.date.startsWith(fMonth)) return;
+                if(fDateFrom && r.date && r.date < fDateFrom) return;
+                if(fDateTo && r.date && r.date > fDateTo) return;
+                if(fSearch) {
+                    const searchString = `${r.name||''} ${r.mobile||''} ${r.key||''} ${r.vendor||''} ${r.serial||''}`.toLowerCase();
+                    if(!searchString.includes(fSearch)) return;
+                }
+
+                let row = `"${rowCounter}","${isSold}","${r.product}","${r.key}","${r.name||''}","${r.mobile||''}","${r.purchaseDate||''}","${r.date||''}","${r.vendor}","${r.serial||''}"`;
+                csvContent += row + "\r\n";
+                rowCounter++;
+            });
+            records.reverse(); // put array back to normal
+
+            var encodedUri = encodeURI(csvContent);
+            var link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `BRIGHT_Sales_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click(); document.body.removeChild(link); 
+        }
+
+    </script>
+</body>
+</html>

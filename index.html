@@ -29,15 +29,20 @@
         /* --- AUTH PAGE --- */
         #auth-page { height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #000, var(--secondary)); }
         .auth-box { background: var(--white); padding: 40px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; max-width: 400px; text-align: center; }
-        .auth-form { display: block; }
-        .auth-box h2 { margin-bottom: 25px; color: var(--secondary); font-size: 1.6rem; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .auth-tabs { display: flex; margin-bottom: 25px; border-bottom: 2px solid #ddd; }
+        .auth-tab { flex: 1; padding: 10px; background: none; border: none; font-size: 16px; font-weight: bold; color: #777; cursor: pointer; }
+        .auth-tab.active { color: var(--secondary); border-bottom: 3px solid var(--secondary); margin-bottom: -2px; }
+        .auth-form { display: none; }
+        .auth-form.active { display: block; }
+        .auth-box h2 { margin-bottom: 20px; color: var(--secondary); font-size: 1.5rem; }
         .input-group { margin-bottom: 15px; text-align: left; }
         .input-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px;}
         .input-group input, .input-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 15px; background: white;}
-        .btn-auth { width: 100%; padding: 12px; background: var(--secondary); color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; margin-top: 15px;}
+        .btn-auth { width: 100%; padding: 12px; background: var(--secondary); color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; margin-top: 10px;}
         .btn-auth:hover { background: #2c3a6b; }
         .msg-box { margin-top: 15px; font-size: 14px; display: none; padding: 10px; border-radius: 5px; }
         .msg-error { background: #ffebee; color: var(--danger); border: 1px solid #ffcdd2; }
+        .msg-success { background: #e8f5e9; color: var(--success); border: 1px solid #c8e6c9; }
 
         /* --- MAIN APP --- */
         #app-page { display: none; height: 100vh; flex-direction: column; }
@@ -111,25 +116,48 @@
     <datalist id="vendorList"></datalist>
     <datalist id="customerList"></datalist>
 
-    <!-- AUTHENTICATION PAGE (HARDCODED LOGIN) -->
+    <!-- AUTHENTICATION PAGE -->
     <div id="auth-page">
         <div class="auth-box">
             <img src="input_file_0.jpeg" alt="BRIGHT Logo" class="brand-logo" onerror="this.style.display='none'">
             <h2>BRIGHT INVENTORY</h2>
             
-            <div id="form-login" class="auth-form">
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchAuthTab('login')">Sign In</button>
+                <button class="auth-tab" onclick="switchAuthTab('signup')">Sign Up</button>
+            </div>
+
+            <!-- SIGN IN FORM -->
+            <div id="form-login" class="auth-form active">
                 <div class="input-group">
-                    <label>Login ID</label>
-                    <input type="text" id="login-user" placeholder="Enter ID" onkeydown="if(event.key==='Enter') document.getElementById('login-pass').focus();">
+                    <label>Gmail ID</label>
+                    <input type="email" id="login-email" placeholder="example@gmail.com" onkeydown="if(event.key==='Enter') document.getElementById('login-pass').focus();">
                 </div>
                 <div class="input-group">
                     <label>Password</label>
                     <input type="password" id="login-pass" placeholder="Enter Password" onkeydown="if(event.key==='Enter') login();">
                 </div>
-                <button class="btn-auth" onclick="login()"><i class="fa-solid fa-right-to-bracket"></i> SECURE LOGIN</button>
+                <button class="btn-auth" onclick="login()"><i class="fa-solid fa-right-to-bracket"></i> SIGN IN</button>
+            </div>
+
+            <!-- SIGN UP FORM -->
+            <div id="form-signup" class="auth-form">
+                <div class="input-group">
+                    <label>Gmail ID</label>
+                    <input type="email" id="signup-email" placeholder="example@gmail.com">
+                </div>
+                <div class="input-group">
+                    <label>Create Password</label>
+                    <input type="password" id="signup-pass" placeholder="Create a Password">
+                </div>
+                <div class="input-group">
+                    <label>Confirm Password</label>
+                    <input type="password" id="signup-pass-confirm" placeholder="Type Password Again">
+                </div>
+                <button class="btn-auth" onclick="signup()"><i class="fa-solid fa-user-plus"></i> CREATE ACCOUNT</button>
             </div>
             
-            <div id="auth-msg" class="msg-box msg-error"></div>
+            <div id="auth-msg" class="msg-box"></div>
         </div>
     </div>
 
@@ -343,6 +371,7 @@
     <script>
         // Data Initialization
         let records = JSON.parse(localStorage.getItem('keyTrackerData')) || [];
+        let usersDB = JSON.parse(localStorage.getItem('keyTrackerUsers')) || [];
         let currentUser = null;
 
         // Backward compatibility mapping for old records
@@ -377,35 +406,91 @@
             document.getElementById('customerList').innerHTML = names.map(n => `<option value="${n}">`).join('');
         }
 
-        // --- HARDCODED AUTHENTICATION ---
-        function login() {
-            const u = document.getElementById('login-user').value.trim();
-            const p = document.getElementById('login-pass').value.trim();
+        // --- AUTHENTICATION WITH GMAIL ---
+        function showMessage(text, isError = true) {
+            const msgBox = document.getElementById('auth-msg');
+            msgBox.style.display = 'block'; msgBox.textContent = text;
+            msgBox.className = isError ? 'msg-box msg-error' : 'msg-box msg-success';
+            setTimeout(() => { msgBox.style.display = 'none'; }, 4000);
+        }
 
-            if (u === 'Jignesh' && p === 'Bright@123') {
-                currentUser = u;
-                document.getElementById('welcome-user').textContent = "User: " + currentUser;
-                document.getElementById('auth-page').style.display = 'none';
-                document.getElementById('app-page').style.display = 'flex';
-                
-                document.getElementById('purchaseDate').valueAsDate = new Date(); // Set today's date
-                updateDataLists();
-                renderTable();
-            } else { 
-                const msgBox = document.getElementById('auth-msg');
-                msgBox.style.display = 'block';
-                msgBox.textContent = "Incorrect ID or Password!";
-                setTimeout(() => { msgBox.style.display = 'none'; }, 4000);
+        function switchAuthTab(tab) {
+            document.querySelectorAll('.auth-tab').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.auth-form').forEach(el => el.classList.remove('active'));
+            if(tab === 'login') {
+                document.querySelectorAll('.auth-tab')[0].classList.add('active');
+                document.getElementById('form-login').classList.add('active');
+            } else {
+                document.querySelectorAll('.auth-tab')[1].classList.add('active');
+                document.getElementById('form-signup').classList.add('active');
             }
+        }
+
+        function signup() {
+            const email = document.getElementById('signup-email').value.trim();
+            const p1 = document.getElementById('signup-pass').value.trim();
+            const p2 = document.getElementById('signup-pass-confirm').value.trim();
+
+            if(!email || !p1 || !p2) return showMessage("Please fill in all fields.");
+            if(p1 !== p2) return showMessage("Passwords do not match!");
+            if(usersDB.find(user => user.email === email)) return showMessage("Gmail ID already exists.");
+
+            usersDB.push({ email: email, password: p1 });
+            localStorage.setItem('keyTrackerUsers', JSON.stringify(usersDB));
+            
+            document.getElementById('signup-email').value = '';
+            document.getElementById('signup-pass').value = '';
+            document.getElementById('signup-pass-confirm').value = '';
+
+            showMessage("Account created! Please Sign In.", false);
+            switchAuthTab('login');
+        }
+
+        function login() {
+            const email = document.getElementById('login-email').value.trim();
+            const p = document.getElementById('login-pass').value.trim();
+            if(!email || !p) return showMessage("Please enter Gmail ID and Password.");
+
+            const validUser = usersDB.find(user => user.email === email && user.password === p);
+            
+            if(validUser) {
+                processLogin(validUser.email);
+            } else { 
+                showMessage("Incorrect Gmail ID or Password!"); 
+            }
+        }
+
+        function processLogin(email) {
+            currentUser = email;
+            localStorage.setItem('brightSession', currentUser); // Remember me forever
+            
+            // Just display the first part of the email nicely
+            let displayName = currentUser.split('@')[0];
+            document.getElementById('welcome-user').textContent = "User: " + displayName;
+            
+            document.getElementById('auth-page').style.display = 'none';
+            document.getElementById('app-page').style.display = 'flex';
+            
+            document.getElementById('purchaseDate').valueAsDate = new Date(); // Set today's date
+            updateDataLists();
+            renderTable();
         }
 
         function logout() {
             currentUser = null;
+            localStorage.removeItem('brightSession'); // Clear Remember Me
             document.getElementById('app-page').style.display = 'none';
             document.getElementById('auth-page').style.display = 'flex';
-            document.getElementById('login-user').value = '';
             document.getElementById('login-pass').value = '';
         }
+
+        // Check if already logged in previously
+        window.onload = function() {
+            let sessionUser = localStorage.getItem('brightSession');
+            if(sessionUser) {
+                processLogin(sessionUser);
+            }
+        };
 
         // --- MAIN APP ---
         function switchTab(tab) {

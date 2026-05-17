@@ -9,7 +9,7 @@
         :root {
             --primary: #2e7d32; 
             --primary-light: #e8f5e9;
-            --secondary: #3A4B86; /* Updated to match logo blue */
+            --secondary: #3A4B86; 
             --dark: #333;
             --light: #f4f6f9;
             --white: #fff;
@@ -29,20 +29,15 @@
         /* --- AUTH PAGE --- */
         #auth-page { height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #000, var(--secondary)); }
         .auth-box { background: var(--white); padding: 40px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; max-width: 400px; text-align: center; }
-        .auth-tabs { display: flex; margin-bottom: 25px; border-bottom: 2px solid #ddd; }
-        .auth-tab { flex: 1; padding: 10px; background: none; border: none; font-size: 16px; font-weight: bold; color: #777; cursor: pointer; }
-        .auth-tab.active { color: var(--secondary); border-bottom: 3px solid var(--secondary); margin-bottom: -2px; }
-        .auth-form { display: none; }
-        .auth-form.active { display: block; }
-        .auth-box h2 { margin-bottom: 20px; color: var(--secondary); font-size: 1.5rem; }
+        .auth-form { display: block; }
+        .auth-box h2 { margin-bottom: 25px; color: var(--secondary); font-size: 1.6rem; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         .input-group { margin-bottom: 15px; text-align: left; }
         .input-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px;}
         .input-group input, .input-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 15px; background: white;}
-        .btn-auth { width: 100%; padding: 12px; background: var(--secondary); color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; margin-top: 10px;}
+        .btn-auth { width: 100%; padding: 12px; background: var(--secondary); color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; margin-top: 15px;}
         .btn-auth:hover { background: #2c3a6b; }
         .msg-box { margin-top: 15px; font-size: 14px; display: none; padding: 10px; border-radius: 5px; }
         .msg-error { background: #ffebee; color: var(--danger); border: 1px solid #ffcdd2; }
-        .msg-success { background: #e8f5e9; color: var(--success); border: 1px solid #c8e6c9; }
 
         /* --- MAIN APP --- */
         #app-page { display: none; height: 100vh; flex-direction: column; }
@@ -116,29 +111,25 @@
     <datalist id="vendorList"></datalist>
     <datalist id="customerList"></datalist>
 
-    <!-- AUTHENTICATION PAGE -->
+    <!-- AUTHENTICATION PAGE (HARDCODED LOGIN) -->
     <div id="auth-page">
         <div class="auth-box">
             <img src="input_file_0.jpeg" alt="BRIGHT Logo" class="brand-logo" onerror="this.style.display='none'">
             <h2>BRIGHT INVENTORY</h2>
-            <div class="auth-tabs">
-                <button class="auth-tab active" onclick="switchAuthTab('login')">Login</button>
-                <button class="auth-tab" onclick="switchAuthTab('signup')">Sign Up</button>
-            </div>
-            <!-- LOGIN FORM -->
-            <div id="form-login" class="auth-form active">
-                <div class="input-group"><label>Username</label><input type="text" id="login-user" placeholder="Enter Username"></div>
-                <div class="input-group"><label>Password</label><input type="password" id="login-pass" placeholder="Enter Password"></div>
+            
+            <div id="form-login" class="auth-form">
+                <div class="input-group">
+                    <label>Login ID</label>
+                    <input type="text" id="login-user" placeholder="Enter ID" onkeydown="if(event.key==='Enter') document.getElementById('login-pass').focus();">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="login-pass" placeholder="Enter Password" onkeydown="if(event.key==='Enter') login();">
+                </div>
                 <button class="btn-auth" onclick="login()"><i class="fa-solid fa-right-to-bracket"></i> SECURE LOGIN</button>
             </div>
-            <!-- SIGN UP FORM -->
-            <div id="form-signup" class="auth-form">
-                <div class="input-group"><label>Create Username</label><input type="text" id="signup-user" placeholder="Choose a Username"></div>
-                <div class="input-group"><label>Create Password</label><input type="password" id="signup-pass" placeholder="Create a Password"></div>
-                <div class="input-group"><label>Confirm Password</label><input type="password" id="signup-pass-confirm" placeholder="Type Password Again"></div>
-                <button class="btn-auth" onclick="signup()"><i class="fa-solid fa-user-plus"></i> CREATE ACCOUNT</button>
-            </div>
-            <div id="auth-msg" class="msg-box"></div>
+            
+            <div id="auth-msg" class="msg-box msg-error"></div>
         </div>
     </div>
 
@@ -352,14 +343,13 @@
     <script>
         // Data Initialization
         let records = JSON.parse(localStorage.getItem('keyTrackerData')) || [];
-        let usersDB = JSON.parse(localStorage.getItem('keyTrackerUsers')) || [];
         let currentUser = null;
 
         // Backward compatibility mapping for old records
         records = records.map(r => {
             if(!r.id) r.id = Date.now() + Math.random(); 
             if(r.keys && !r.key) r.key = r.keys; 
-            if(!r.purchaseDate) r.purchaseDate = r.date || ''; // Map old date to purchase if missing
+            if(!r.purchaseDate) r.purchaseDate = r.date || ''; 
             return r;
         });
 
@@ -368,11 +358,11 @@
         enterNavInputs.forEach((input, index) => {
             input.addEventListener('keydown', function(event) {
                 if (event.key === 'Enter') {
-                    event.preventDefault(); // Stop default form submit
+                    event.preventDefault(); 
                     if (index < enterNavInputs.length - 1) {
-                        enterNavInputs[index + 1].focus(); // Move to next input
+                        enterNavInputs[index + 1].focus(); 
                     } else {
-                        document.getElementById('btnSubmitForm').click(); // Submit if last
+                        document.getElementById('btnSubmitForm').click(); 
                     }
                 }
             });
@@ -387,84 +377,35 @@
             document.getElementById('customerList').innerHTML = names.map(n => `<option value="${n}">`).join('');
         }
 
-        // --- AUTHENTICATION ---
-        function showMessage(text, isError = true) {
-            const msgBox = document.getElementById('auth-msg');
-            msgBox.style.display = 'block'; msgBox.textContent = text;
-            msgBox.className = isError ? 'msg-box msg-error' : 'msg-box msg-success';
-            setTimeout(() => { msgBox.style.display = 'none'; }, 4000);
-        }
-
-        function switchAuthTab(tab) {
-            document.querySelectorAll('.auth-tab').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.auth-form').forEach(el => el.classList.remove('active'));
-            if(tab === 'login') {
-                document.querySelectorAll('.auth-tab')[0].classList.add('active');
-                document.getElementById('form-login').classList.add('active');
-            } else {
-                document.querySelectorAll('.auth-tab')[1].classList.add('active');
-                document.getElementById('form-signup').classList.add('active');
-            }
-        }
-
-        function signup() {
-            const u = document.getElementById('signup-user').value.trim();
-            const p1 = document.getElementById('signup-pass').value.trim();
-            const p2 = document.getElementById('signup-pass-confirm').value.trim();
-
-            if(!u || !p1 || !p2) return showMessage("Please fill in all fields.");
-            if(p1 !== p2) return showMessage("Passwords do not match!");
-            if(usersDB.find(user => user.username === u)) return showMessage("Username already exists.");
-
-            usersDB.push({ username: u, password: p1 });
-            localStorage.setItem('keyTrackerUsers', JSON.stringify(usersDB));
-            
-            document.getElementById('signup-user').value = '';
-            document.getElementById('signup-pass').value = '';
-            document.getElementById('signup-pass-confirm').value = '';
-
-            showMessage("Account created! Please Login.", false);
-            switchAuthTab('login');
-        }
-
+        // --- HARDCODED AUTHENTICATION ---
         function login() {
             const u = document.getElementById('login-user').value.trim();
             const p = document.getElementById('login-pass').value.trim();
-            if(!u || !p) return showMessage("Please enter username and password.");
 
-            const validUser = usersDB.find(user => user.username === u && user.password === p);
-            if(validUser) {
-                processLogin(validUser.username);
-            } else { showMessage("Incorrect Username or Password!"); }
-        }
-
-        function processLogin(username) {
-            currentUser = username;
-            localStorage.setItem('brightSession', currentUser); // Remember Me
-            document.getElementById('welcome-user').textContent = "User: " + currentUser;
-            document.getElementById('auth-page').style.display = 'none';
-            document.getElementById('app-page').style.display = 'flex';
-            
-            document.getElementById('purchaseDate').valueAsDate = new Date(); // Set today's date
-            updateDataLists();
-            renderTable();
+            if (u === 'Jignesh' && p === 'Bright@123') {
+                currentUser = u;
+                document.getElementById('welcome-user').textContent = "User: " + currentUser;
+                document.getElementById('auth-page').style.display = 'none';
+                document.getElementById('app-page').style.display = 'flex';
+                
+                document.getElementById('purchaseDate').valueAsDate = new Date(); // Set today's date
+                updateDataLists();
+                renderTable();
+            } else { 
+                const msgBox = document.getElementById('auth-msg');
+                msgBox.style.display = 'block';
+                msgBox.textContent = "Incorrect ID or Password!";
+                setTimeout(() => { msgBox.style.display = 'none'; }, 4000);
+            }
         }
 
         function logout() {
             currentUser = null;
-            localStorage.removeItem('brightSession'); // Clear Remember Me
             document.getElementById('app-page').style.display = 'none';
             document.getElementById('auth-page').style.display = 'flex';
+            document.getElementById('login-user').value = '';
             document.getElementById('login-pass').value = '';
         }
-
-        // Check if already logged in previously
-        window.onload = function() {
-            let sessionUser = localStorage.getItem('brightSession');
-            if(sessionUser) {
-                processLogin(sessionUser);
-            }
-        };
 
         // --- MAIN APP ---
         function switchTab(tab) {
@@ -473,7 +414,7 @@
             if(tab === 'add') {
                 document.getElementById('section-add').classList.add('active');
                 document.querySelectorAll('.btn-tab')[0].classList.add('active');
-                document.getElementById('productName').focus(); // Auto focus for easy typing
+                document.getElementById('productName').focus(); // Auto focus
             } else {
                 document.getElementById('section-view').classList.add('active');
                 document.querySelectorAll('.btn-tab')[1].classList.add('active');
@@ -503,7 +444,7 @@
                 records.push({
                     id: Date.now() + Math.random(), 
                     purchaseDate: purDate,
-                    date: saleDate, // Using date for saleDate to keep old logic
+                    date: saleDate, 
                     name: nameVal,
                     mobile: mobVal,
                     vendor: vendorVal,
@@ -515,11 +456,10 @@
             });
 
             localStorage.setItem('keyTrackerData', JSON.stringify(records)); 
-            updateDataLists(); // Refresh suggestions
+            updateDataLists(); 
             
             alert(`Successfully added ${validKeys.length} key(s) to inventory!`);
             
-            // Clear keys, serial, and customer, keep vendor and product
             document.getElementById('key1').value = '';
             document.getElementById('key2').value = '';
             document.getElementById('key3').value = '';
@@ -527,7 +467,7 @@
             document.getElementById('custName').value = '';
             document.getElementById('mobile').value = '';
             document.getElementById('saleDate').value = '';
-            document.getElementById('key1').focus(); // Put cursor back for fast entry
+            document.getElementById('key1').focus(); 
         }
 
         function renderTable() {
@@ -541,7 +481,7 @@
             const fDateTo = document.getElementById('dateTo').value;
             const fSearch = document.getElementById('searchBar').value.toLowerCase();
 
-            let srNoCounter = 1; // Counter for visible rows
+            let srNoCounter = 1; 
 
             // Sort by Purchase Date (Newest first)
             let sortedRecords = [...records].reverse();
@@ -552,7 +492,7 @@
                 if(fStatus === 'STOCK' && isSold) return;
                 if(fStatus === 'SOLD' && !isSold) return;
                 if(fProduct !== 'ALL' && rec.product !== fProduct) return; 
-                if(fMonth && rec.date && !rec.date.startsWith(fMonth)) return; // Filters by Sale Date month
+                if(fMonth && rec.date && !rec.date.startsWith(fMonth)) return; 
                 if(fDateFrom && rec.date && rec.date < fDateFrom) return;
                 if(fDateTo && rec.date && rec.date > fDateTo) return;
                 if(fSearch) {
@@ -605,7 +545,6 @@
             document.getElementById('editCustName').value = rec.name || '';
             document.getElementById('editMobile').value = rec.mobile || '';
             
-            // Auto fill today's sale date if we are just now adding a customer
             if(!rec.date && !rec.name) {
                 let today = new Date();
                 let yyyy = today.getFullYear();
@@ -636,7 +575,7 @@
             records[index].serial = document.getElementById('editSerialNo').value.trim();
             records[index].name = document.getElementById('editCustName').value.trim();
             records[index].mobile = document.getElementById('editMobile').value.trim();
-            records[index].date = document.getElementById('editSaleDate').value; // Sale date
+            records[index].date = document.getElementById('editSaleDate').value; 
 
             localStorage.setItem('keyTrackerData', JSON.stringify(records));
             updateDataLists();
@@ -687,7 +626,6 @@
             records.reverse().forEach(function(r) {
                 let isSold = r.name ? "SOLD" : "IN STOCK";
                 
-                // Mirror logic from renderTable for accurate CSV export of current view
                 const fStatus = document.getElementById('filterStatus').value;
                 const fProduct = document.getElementById('filterProduct').value;
                 const fMonth = document.getElementById('filterMonth').value; 
@@ -710,7 +648,7 @@
                 csvContent += row + "\r\n";
                 rowCounter++;
             });
-            records.reverse(); // put array back to normal
+            records.reverse(); 
 
             var encodedUri = encodeURI(csvContent);
             var link = document.createElement("a");
